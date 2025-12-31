@@ -43,6 +43,16 @@ func main() {
 		logrus.Fatalf("Failed to migrate database: %v", err)
 	}
 
+	// Manual migration: Make due_date nullable (GORM AutoMigrate doesn't always modify existing columns)
+	// This is safe to run multiple times - if the column is already nullable, it will just be a no-op
+	err = postgres.Exec("ALTER TABLE invoices ALTER COLUMN due_date DROP NOT NULL").Error
+	if err != nil {
+		// Log warning but don't fail - column might already be nullable or migration might have run
+		logrus.Warnf("Could not alter due_date column (may already be nullable): %v", err)
+	} else {
+		logrus.Info("Successfully made due_date column nullable")
+	}
+
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(postgres)
 	companyRepo := repository.NewCompanyRepository(postgres)
