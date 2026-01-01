@@ -3,7 +3,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN CGO_ENABLED=0 go build -o /bikinota .
+RUN CGO_ENABLED=0 go build -o /server .
 
 FROM gcr.io/distroless/static
 WORKDIR /app
