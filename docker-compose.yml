@@ -1,0 +1,15 @@
+services:
+  app:
+    container_name: bikinota
+    tty: true
+    build: .
+    ports:
+      - 8080:8080
+    restart: on-failure
+    volumes:
+      - .:/app
+    networks:
+      - bikinota_network
+networks:
+  bikinota_network:
+    driver: bridge
