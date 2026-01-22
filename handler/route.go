@@ -16,6 +16,10 @@ func SetupRoutes(e *echo.Echo, userRepo repository.UserRepository, companyRepo r
 			echo.HeaderContentType,
 			echo.HeaderAccept,
 			echo.HeaderAuthorization,
+			"X-Polar-Signature", // For Polar.sh webhook signature verification
+			"webhook-id",        // For Polar.sh webhook signature verification
+			"webhook-signature", // For Polar.sh webhook signature verification
+			"webhook-timestamp", // For Polar.sh webhook signature verification
 		},
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.PATCH, echo.OPTIONS},
 	}))
@@ -77,5 +81,13 @@ func SetupRoutes(e *echo.Echo, userRepo repository.UserRepository, companyRepo r
 	invoice.POST("", invoiceHandler.CreateInvoice)
 	invoice.PUT("/:id", invoiceHandler.UpdateInvoice)
 	invoice.DELETE("/:id", invoiceHandler.DeleteInvoice)
+
+	// Payment routes (protected)
+	paymentHandler := NewPaymentHandler()
+	protected.GET("/payment/checkout-link", paymentHandler.CreateCheckoutLink)
+
+	// Webhook endpoint (public, but signature verified)
+	webhookHandler := NewWebhookHandler(planRepo, userRepo)
+	e.POST("/api/webhooks/polar", webhookHandler.HandleWebhook)
 }
 
