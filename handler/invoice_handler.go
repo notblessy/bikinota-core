@@ -399,6 +399,49 @@ func (h *invoiceHandler) UpdateInvoice(c echo.Context) error {
 	})
 }
 
+// DuplicateInvoice duplicates an existing invoice with a new invoice number and draft status
+func (h *invoiceHandler) DuplicateInvoice(c echo.Context) error {
+	logger := logrus.WithField("endpoint", "duplicate_invoice")
+
+	userClaims, err := authSession(c)
+	if err != nil {
+		logger.Errorf("Error getting session: %v", err)
+		return c.JSON(http.StatusUnauthorized, response{
+			Success: false,
+			Message: "unauthorized",
+		})
+	}
+
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, response{
+			Success: false,
+			Message: "invalid invoice id",
+		})
+	}
+
+	newInvoice, err := h.invoiceRepo.Duplicate(c.Request().Context(), uint(id), userClaims.ID)
+	if err != nil {
+		logger.Errorf("Error duplicating invoice: %v", err)
+		if err.Error() == "access denied" {
+			return c.JSON(http.StatusForbidden, response{
+				Success: false,
+				Message: "access denied",
+			})
+		}
+		return c.JSON(http.StatusInternalServerError, response{
+			Success: false,
+			Message: "failed to duplicate invoice",
+		})
+	}
+
+	return c.JSON(http.StatusCreated, response{
+		Success: true,
+		Data:    newInvoice.ToInvoiceResponse(),
+	})
+}
+
 // DeleteInvoice deletes an invoice
 func (h *invoiceHandler) DeleteInvoice(c echo.Context) error {
 	logger := logrus.WithField("endpoint", "delete_invoice")

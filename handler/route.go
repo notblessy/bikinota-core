@@ -80,6 +80,7 @@ func SetupRoutes(e *echo.Echo, userRepo repository.UserRepository, companyRepo r
 	invoice.GET("/:id", invoiceHandler.GetInvoice)
 	invoice.POST("", invoiceHandler.CreateInvoice)
 	invoice.PUT("/:id", invoiceHandler.UpdateInvoice)
+	invoice.POST("/:id/duplicate", invoiceHandler.DuplicateInvoice)
 	invoice.DELETE("/:id", invoiceHandler.DeleteInvoice)
 
 	// Payment routes (protected)

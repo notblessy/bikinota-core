@@ -16,6 +16,7 @@ type InvoiceRepository interface {
 	Create(ctx context.Context, invoice *model.Invoice) error
 	Update(ctx context.Context, invoice *model.Invoice) error
 	Delete(ctx context.Context, id uint) error
+	Duplicate(ctx context.Context, id uint, userID uint) (*model.Invoice, error)
 }
 
 type invoiceRepository struct {
@@ -50,17 +51,16 @@ func (r *invoiceRepository) FindByID(ctx context.Context, id uint) (*model.Invoi
 }
 
 func (r *invoiceRepository) Create(ctx context.Context, invoice *model.Invoice) error {
-	// Generate invoice number
+	// Generate invoice number with global auto-increment
 	year := time.Now().Year()
 	month := int(time.Now().Month())
-	
-	// Count invoices for this user this month
+
+	// Count ALL invoices for this user (global counter)
 	var count int64
 	r.db.WithContext(ctx).Model(&model.Invoice{}).
-		Where("user_id = ? AND EXTRACT(YEAR FROM created_at) = ? AND EXTRACT(MONTH FROM created_at) = ?", 
-			invoice.UserID, year, month).
+		Where("user_id = ?", invoice.UserID).
 		Count(&count)
-	
+
 	invoice.InvoiceNumber = fmt.Sprintf("INV-%d%02d-%03d", year, month, count+1)
 	
 	return r.db.WithContext(ctx).Create(invoice).Error
@@ -161,6 +161,68 @@ func (r *invoiceRepository) Update(ctx context.Context, invoice *model.Invoice) 
 
 func (r *invoiceRepository) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Delete(&model.Invoice{}, id).Error
+}
+
+func (r *invoiceRepository) Duplicate(ctx context.Context, id uint, userID uint) (*model.Invoice, error) {
+	// Find the original invoice with items and adjustments
+	var original model.Invoice
+	err := r.db.WithContext(ctx).
+		Preload("Items").
+		Preload("Adjustments").
+		First(&original, id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify ownership
+	if original.UserID != userID {
+		return nil, fmt.Errorf("access denied")
+	}
+
+	// Clone items
+	items := make([]model.InvoiceItem, len(original.Items))
+	for i, item := range original.Items {
+		items[i] = model.InvoiceItem{
+			Name:        item.Name,
+			Description: item.Description,
+			Quantity:    item.Quantity,
+			Price:       item.Price,
+		}
+	}
+
+	// Clone adjustments
+	adjustments := make([]model.InvoiceAdjustment, len(original.Adjustments))
+	for i, adj := range original.Adjustments {
+		adjustments[i] = model.InvoiceAdjustment{
+			Description: adj.Description,
+			Type:        adj.Type,
+			Amount:      adj.Amount,
+		}
+	}
+
+	// Create new invoice as draft
+	newInvoice := &model.Invoice{
+		UserID:           original.UserID,
+		CustomerName:     original.CustomerName,
+		CustomerEmail:    original.CustomerEmail,
+		DueDate:          original.DueDate,
+		TaxRate:          original.TaxRate,
+		Status:           "draft",
+		Subtotal:         original.Subtotal,
+		TaxAmount:        original.TaxAmount,
+		AdjustmentsTotal: original.AdjustmentsTotal,
+		Total:            original.Total,
+		BankAccountID:    original.BankAccountID,
+		Items:            items,
+		Adjustments:      adjustments,
+	}
+
+	// Create will auto-generate invoice number
+	if err := r.Create(ctx, newInvoice); err != nil {
+		return nil, err
+	}
+
+	return newInvoice, nil
 }
 
 // Helper function to convert string ID to uint
