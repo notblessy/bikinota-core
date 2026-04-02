@@ -278,6 +278,9 @@ func (h *invoiceHandler) UpdateInvoice(c echo.Context) error {
 	}
 
 	// Update fields
+	if req.InvoiceNumber != nil && *req.InvoiceNumber != "" {
+		invoice.InvoiceNumber = *req.InvoiceNumber
+	}
 	if req.CustomerName != nil {
 		invoice.CustomerName = *req.CustomerName
 	}

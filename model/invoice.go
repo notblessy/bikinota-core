@@ -92,6 +92,7 @@ type UpdateInvoiceAdjustmentRequest struct {
 }
 
 type UpdateInvoiceRequest struct {
+	InvoiceNumber *string                          `json:"invoice_number"`
 	CustomerName  *string                          `json:"customer_name"`
 	CustomerEmail *string                          `json:"customer_email"`
 	DueDate       *string                          `json:"due_date"`
